@@ -48,3 +48,13 @@ except:
         QMessageBox.information(None,
                                 "Information", "Packages not installed. Some UMEP tools will not be fully operational.")
 # setup_supy(ver='2020.1.23')
+
+# # for standalone usage of util package comment code above and uncomment the following:
+# try:
+#     import supy as sp
+#     from supy import __version__ as ver_supy
+#     import numba
+#     import jaydebeapi
+# except:
+#     print("Supy installation not succesful.")
+#     pass
