@@ -34,8 +34,8 @@ from osgeo import gdal, osr
 from osgeo.gdalconst import *
 import os
 import numpy as np
-
-
+import inspect
+from pathlib import Path
 import zipfile
 import sys
 from util import misc
@@ -75,7 +75,7 @@ class ProcessingSkyViewFactorAlgorithm():
             self.TRANS_VEG: {'desc': 'Transmissivity of light through vegetation (%):', 'type': int, 'min':0, 'max':100, 'default': 3},
             self.INPUT_TDSM: {'desc': 'Vegetation Trunk-zone DSM', 'type': str, 'default': None},
             self.INPUT_THEIGHT: {'desc': "Trunk zone height (percent of Canopy Height). Used if no Vegetation Trunk-zone DSM is loaded", 'type': float, 'min': 0.1, 'max': 99.9, 'default': 25.0},
-            self.ANISO: {'desc': 'Use method with 153 shadow images instead of 655. Required for anisotropic sky scheme (SOLWEIG)', 'type':bool, 'default': False},
+            self.ANISO: {'desc': 'Use method with 153 shadow images instead of 655. Required for anisotropic sky scheme (SOLWEIG)', 'type':bool, 'default': True},
             self.OUTPUT_DIR: {'desc': 'Output folder for individual raster files', 'type': str},
             self.OUTPUT_FILE: {'desc': 'Output sky view factor raster', 'type': str}
         }
@@ -103,7 +103,7 @@ class ProcessingSkyViewFactorAlgorithm():
 
         # provider = dsmlayer.dataProvider()
         # filepath_dsm = str(provider.dataSourceUri())
-        gdal_dsm = gdal.Open(os.path.join(os.getcwd(), parameter_dict["dsmlayer"]))  # filepath_dsm)
+        gdal_dsm = gdal.Open(parameter_dict["dsmlayer"])  # filepath_dsm)
         dsm = gdal_dsm.ReadAsArray().astype(float)
 
         # response to issue #85
@@ -131,7 +131,7 @@ class ProcessingSkyViewFactorAlgorithm():
             gdal.AllRegister()
             # provider = vegdsm.dataProvider()
             # filePathOld = str(provider.dataSourceUri())
-            dataSet = gdal.Open(os.path.join(os.getcwd(), parameter_dict["vegdsm"]))  # filePathOld)
+            dataSet = gdal.Open(parameter_dict["vegdsm"]) # filePathOld)
             vegdsm = dataSet.ReadAsArray().astype(float)
 
             vegsizex = vegdsm.shape[0]
@@ -168,7 +168,7 @@ class ProcessingSkyViewFactorAlgorithm():
             usevegdem = 0
 
         logger.debug(f"aniso is {parameter_dict['aniso']} {parameter_dict['aniso']  is not None}")
-        if parameter_dict["aniso"] != "None":  # == 1:
+        if parameter_dict["aniso"]:  # == 1:
             logger.info('Calculating SVF using 153 iterations')
             ret = svf.svfForProcessing153(dsm, vegdsm, vegdsm2, scale, usevegdem)
         else:
@@ -179,7 +179,7 @@ class ProcessingSkyViewFactorAlgorithm():
 
         # temporary fix for mac, ISSUE #15
         pf = sys.platform
-        outputDir = os.path.join(os.getcwd(), parameter_dict["outputDir"])
+        outputDir = os.path.join(parameter_dict["outputDir"])
         if pf == 'darwin' or pf == 'linux2' or pf == 'linux':
             if not os.path.exists(outputDir):
                 os.makedirs(outputDir)
@@ -270,7 +270,7 @@ class ProcessingSkyViewFactorAlgorithm():
             misc.saveraster(gdal_dsm, filename, svftotal)
 
             # Save shadow images for SOLWEIG 2019a
-            if parameter_dict["aniso"] != "None":  # == 1:
+            if parameter_dict["aniso"]:  # == 1:
                 shmat = ret["shmat"]
                 vegshmat = ret["vegshmat"]
                 vbshvegshmat = ret["vbshvegshmat"]
@@ -316,6 +316,7 @@ class ProcessingSkyViewFactorAlgorithm():
         url = "https://umep-docs.readthedocs.io/en/latest/pre-processor/Urban%20Geometry%20Sky%20View%20Factor%20Calculator.html"
         return url
 
+    # Functions tr(..) and icon(..) are not required in the standalone version
     # def tr(self, string):
     #     return QCoreApplication.translate('Processing', string)
     #
@@ -355,7 +356,10 @@ class ProcessingSkyViewFactorAlgorithm():
         return parameter_dict
 
     def _check_parameter(self, parameter_list, eigen_parameter):
-        value = parameter_list[eigen_parameter]
+        try:
+            value = parameter_list[eigen_parameter]
+        except:
+            raise KeyError(f"Parameter {eigen_parameter} was not defined.")
         expected_type = self.param_desc_dict[eigen_parameter]['type']
         logger.debug(f"{value} expected type {expected_type} Any? {expected_type is Any} matching? {isinstance(value, expected_type)} str? {expected_type == str}  tif? {'tif' in str(value)}")
         if expected_type is Any:

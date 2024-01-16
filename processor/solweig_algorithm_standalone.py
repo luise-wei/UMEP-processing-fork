@@ -21,7 +21,6 @@
  *                                                                         *
  ***************************************************************************/
 """
-from __future__ import absolute_import
 
 __author__ = 'Fredrik Lindberg'
 __date__ = '2020-04-02'
@@ -37,13 +36,12 @@ import logging
 from osgeo import gdal, osr, ogr
 from osgeo.gdalconst import *
 import osgeo
+import errno
 import os
-# from qgis.PyQt.QtGui import QIcon
-import inspect
-from pathlib import Path, PurePath
+
 from util.misc import get_ders, saveraster
 import zipfile
-from osgeo.gdalconst import *
+
 from util.SEBESOLWEIGCommonFiles.Solweig_v2015_metdata_noload import Solweig_2015a_metdata_noload
 from util.SEBESOLWEIGCommonFiles import Solweig_v2015_metdata_noload as metload
 from util.SEBESOLWEIGCommonFiles.clearnessindex_2013b import clearnessindex_2013b
@@ -53,6 +51,10 @@ from functions.SOLWEIGpython import WriteMetadataSOLWEIG
 from functions.SOLWEIGpython import PET_calculations as p
 from functions.SOLWEIGpython import UTCI_calculations as utci
 from functions.SOLWEIGpython.CirclePlotBar import PolarBarPlot
+import matplotlib.pyplot as plt
+from shutil import copyfile, rmtree
+import string
+import random
 
 # For "Save necessary rasters for TreePlanter tool"
 from shutil import copyfile
@@ -162,7 +164,7 @@ class ProcessingSOLWEIGAlgorithm():
             #Tmrt parameters
             self.ABS_S: {'desc': 'Absorption of shortwave radiation of human body', 'type': float, 'min': 0,'max': 1, 'default': 0.70},
             self.ABS_L: {'desc': 'Absorption of longwave radiation of human body', 'type': float, 'min': 0,'max': 1, 'default': 0.95},
-            self.POSTURE: {'desc': 'Posture of human body', 'type': int, 'min': 0,'max': 1, 'default':0, 'options': {'Standing': '0', 'Sitting': '1'}},
+            self.POSTURE: {'desc': 'Posture of human body', 'type': int, 'min': 0,'max': 1, 'default':0, 'options': {'0': 'Standing', '1': 'Sitting'}},
             self.CYL: {'desc': "Consider human as cylinder instead of box", 'type': bool, 'default': True},
 
             #Meteorology
@@ -174,7 +176,7 @@ class ProcessingSOLWEIGAlgorithm():
             #POIs for thermal comfort estimations
             self.POI_FILE: {'desc': 'Vector point file including Point of Interest(s) for thermal comfort calculations (PET and UTCI)', 'type':str, 'default': None},
             # todo: flags? # poifile.setFlags(poifile.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
-            self.POI_FIELD: {'desc': 'ID field', 'type': Any, 'default': None},
+            self.POI_FIELD: {'desc': 'ID field', 'type': str, 'default': None},
             # todo: flags? # poi_field.setFlags(poi_field.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
 
             #PET parameters
@@ -186,36 +188,35 @@ class ProcessingSOLWEIGAlgorithm():
             # tdod: flags? # clo.setFlags(clo.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.WEIGHT: {'desc': 'Weight (kg)', 'type': int, 'min': 0, 'max': 500, 'default': 75},
             # todo: flags? # wei.setFlags(wei.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
-            self. HEIGHT: {'desc': 'Height (cm)', 'type': int, 'min': 0, 'max': 250, 'default': 180},
+            self.HEIGHT: {'desc': 'Height (cm)', 'type': int, 'min': 0, 'max': 250, 'default': 180},
             #todo: flags? # hei.setFlags(hei.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
-            self.SEX: {'desc': 'Sex', 'type': str, 'default': 0, 'options': {'Male': 0, 'Female': 1}},
+            self.SEX: {'desc': 'Sex', 'type': int, 'default': 0, 'options': {0: 'Male', 1: 'Female'}},
             # todo: flags? sex.setFlags(sex.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
             self.SENSOR_HEIGHT: {'desc': 'Height of wind sensor (m agl)', 'type': float, 'min': 0, 'max': 250, 'default': 10},
             # todo: flags? # shei.setFlags(shei.flags() | QgsProcessingParameterDefinition.FlagAdvanced)
 
             #OUTPUT
             self.OUTPUT_TMRT: {'desc': "Save Mean Radiant Temperature raster(s)", 'type': bool, 'default': True},
-            self.OUTPUT_KDOWN: {'desc': "Save Incoming shortwave radiation raster(s)", 'type': bool, 'default': True},
-            self.OUTPUT_KUP: {'desc': "Save Outgoing shortwave radiation raster(s)", 'type': bool, 'default': True},
-            self.OUTPUT_LDOWN: {'desc': "Save Incoming longwave radiation raster(s)", 'type': bool, 'default': True},
-            self.OUTPUT_LUP: {'desc': "Save Outgoing longwave radiation raster(s)", 'type': bool, 'default': True},
-            self.OUTPUT_SH: {'desc': "Save shadow raster(s)", 'type': bool, 'default': True},
-            self.OUTPUT_TREEPLANTER: {'desc': "Save necessary raster(s) for the TreePlanter tool", 'type': bool, 'default': True},
+            self.OUTPUT_KDOWN: {'desc': "Save Incoming shortwave radiation raster(s)", 'type': bool, 'default': False},
+            self.OUTPUT_KUP: {'desc': "Save Outgoing shortwave radiation raster(s)", 'type': bool, 'default': False},
+            self.OUTPUT_LDOWN: {'desc': "Save Incoming longwave radiation raster(s)", 'type': bool, 'default': False},
+            self.OUTPUT_LUP: {'desc': "Save Outgoing longwave radiation raster(s)", 'type': bool, 'default': False},
+            self.OUTPUT_SH: {'desc': "Save shadow raster(s)", 'type': bool, 'default': False},
+            self.OUTPUT_TREEPLANTER: {'desc': "Save necessary raster(s) for the TreePlanter and Spatial TC tools", 'type': bool, 'default': False},
             self.OUTPUT_DIR: {'desc':'Output folder' , 'type': str},
 
         }
 
-        self.plugin_dir =  os.path.dirname(__file__)
-        self.temp_dir =  os.path.dirname(self.plugin_dir) + '/temp'
-        print("temp_dir", self.temp_dir)
+        self.plugin_dir = os.path.dirname(__file__)
+        temp_dir_name = 'temp-' + ''.join(random.choice(string.ascii_uppercase) for _ in range(8))
+        self.temp_dir = os.path.join(os.path.dirname(self.plugin_dir), temp_dir_name)
 
-    def processAlgorithm(self, parameters) :  # , context, feedback):
+    def processAlgorithm(self, parameters):  # , context, feedback):
         """
         qgis-free vesion of solweig_algorithm.processAlgorithm for executing solweig application
 
-
         Args:
-            parameters:  parameters for solweig
+            parameters:  dict of parameters for solweig
 
         Returns:
 
@@ -231,27 +232,11 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Code from old plugin
         # provider = parameter_dict["dsmlayer"].dataProvider()
+        self.check_if_path_exists(parameter_dict["dsmlayer"])
 
-        filepath_dsm = os.path.join(os.getcwd(), parameter_dict["dsmlayer"])  # str(provider.dataSourceUri())
+        filepath_dsm = parameter_dict["dsmlayer"]  # str(provider.dataSourceUri())
         gdal_dsm = gdal.Open(filepath_dsm, gdal.GA_ReadOnly)
         logger.debug(f"dsm layer: {gdal_dsm} {gdal_dsm.GetRasterBand(1)}")
-        logger.debug(f"Available Functions: { dir(gdal_dsm)}")
-        logger.debug(f"Band XSize {gdal_dsm.RasterXSize}")
-        logger.debug(f"Band YSize {gdal_dsm.RasterYSize}")
-
-        logger.debug(f"Available Functions: { dir(gdal_dsm.GetRasterBand(1))}")
-        # meaningless values
-        logger.debug(f"Band No Data Value {gdal_dsm.GetRasterBand(1).GetNoDataValue()}")
-        # largest value in the band
-        logger.debug(f"Band max. {gdal_dsm.GetRasterBand(1).GetMaximum()}")
-        # smallest value in the band
-        logger.debug(f"Band min. {gdal_dsm.GetRasterBand(1).GetMinimum()}")
-        # max min values before are None because the file format does not have an inherent maximum and minimum value
-        # therefore, calculate them with the following function
-        logger.debug(f"Band MinMax {gdal_dsm.GetRasterBand(1).ComputeRasterMinMax()}")
-
-
-
         dsm = gdal_dsm.ReadAsArray().astype(float)
         sizex = dsm.shape[0]
         sizey = dsm.shape[1]
@@ -324,13 +309,14 @@ class ProcessingSOLWEIGAlgorithm():
 
         # if useVegdem:
         if parameter_dict["vegdsm"] != "None":
+            self.check_if_path_exists(parameter_dict["vegdsm"])
             usevegdem = 1
             logger.debug('Vegetation scheme activated')
 
             # load raster
             gdal.AllRegister()
             # provider = parameter_dict["vegdsm"].dataProvider()
-            filePathOld = os.path.join(os.getcwd(), parameter_dict["vegdsm"])  # str(provider.dataSourceUri())
+            filePathOld = parameter_dict["vegdsm"]  # str(provider.dataSourceUri())
             dataSet = gdal.Open(filePathOld)
             vegdsm = dataSet.ReadAsArray().astype(float)
             filePath_cdsm = filePathOld
@@ -339,14 +325,13 @@ class ProcessingSOLWEIGAlgorithm():
 
             if not (vegsizex == sizex) & (vegsizey == sizey):
                 raise ValueError("Error in Vegetation Canopy DSM: All rasters must be of same extent and resolution")
-                # raise QgsProcessingException("Error in Vegetation Canopy DSM: All rasters must be of same extent and resolution")
 
             if parameter_dict["vegdsm2"] != "None":
-                logger.debug(f"value of vegdsm2 {type(parameter_dict['vegdsm2'])} {parameter_dict['vegdsm2'] is None}")
+                self.check_if_path_exists(parameter_dict["vegdsm2"])
                 gdal.AllRegister()
                 # provider = parameter_dict["vegdsm2"].dataProvider()
                 # filePathOld = str(provider.dataSourceUri())
-                filePath_tdsm = os.path.join(os.getcwd(), parameter_dict["vegdsm2"])  # filePathOld
+                filePath_tdsm = parameter_dict["vegdsm2"]  # filePathOld
                 dataSet = gdal.Open(parameter_dict["vegdsm2"])  # filePathOld)
                 vegdsm2 = dataSet.ReadAsArray().astype(float)
             else:
@@ -359,7 +344,6 @@ class ProcessingSOLWEIGAlgorithm():
 
             if not (vegsizex == sizex) & (vegsizey == sizey):  # &
                 raise ValueError("Error in Trunk Zone DSM: All rasters must be of same extent and resolution")
-                # raise QgsProcessingException("Error in Trunk Zone DSM: All rasters must be of same extent and resolution")
         else:
             vegdsm = np.zeros([rows, cols])
             vegdsm2 = np.zeros([rows, cols])
@@ -369,6 +353,7 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Land cover
         if parameter_dict["lcgrid"] != "None":
+            self.check_if_path_exists(parameter_dict["lcgrid"])
             landcover = 1
             logger.debug('Land cover scheme activated')
 
@@ -384,32 +369,29 @@ class ProcessingSOLWEIGAlgorithm():
 
             if not (lcsizex == sizex) & (lcsizey == sizey):
                 raise ValueError("Error in land cover grid: All grids must be of same extent and resolution")
-                # raise QgsProcessingException("Error in land cover grid: All grids must be of same extent and resolution")
 
             baddataConifer = (lcgrid == 3)
             baddataDecid = (lcgrid == 4)
             if baddataConifer.any():
                 raise ValueError("Error in land cover grid: Land cover grid includes Confier land cover class. Ground cover information (underneath canopy) is required.")
-                # raise QgsProcessingException("Error in land cover grid: Land cover grid includes Confier land cover class. Ground cover information (underneath canopy) is required.")
             if baddataDecid.any():
                 raise ValueError("Error in land cover grid: Land cover grid includes Decidiuous land cover class. Ground cover information (underneath canopy) is required.")
-                # raise QgsProcessingException("Error in land cover grid: Land cover grid includes Decidiuous land cover class. Ground cover information (underneath canopy) is required.")
+            if np.isnan(lcgrid).any():
+                raise ValueError("Error in land cover grid: Land cover grid includes NaN values. Use the QGIS Fill NoData cells tool to remove NaN values.")
         else:
-            lcgrid = None
+            lcgrid = None  # set manually, otherwise lcgrid would be undefined for later use
             filePath_lc = None
             landcover = 0
 
         # DEM #
-        dem = None
-        demraise = 0
+        dem = None  # set manually, otherwise lcgrid would be undefined for later use
         if not parameter_dict["useLcBuild"]:
             demforbuild = 1
-            dem = os.path.join(os.getcwd(), parameter_dict["dem"])
-            logger.debug(f"dem is {dem} {type(dem)} {dem is None}")
-            # dem = self.parameterAsRasterLayer(parameters, self.INPUT_DEM, context)
+            dem = parameter_dict["dem"]
 
-            if dem is None:
+            if dem == "None":
                 raise ValueError("Error: No valid DEM selected")
+            self.check_if_path_exists(dem)
 
             # load raster
             gdal.AllRegister()
@@ -423,7 +405,6 @@ class ProcessingSOLWEIGAlgorithm():
 
             if not (demsizex == sizex) & (demsizey == sizey):
                 raise ValueError("Error in DEM: All grids must be of same extent and resolution")
-                # raise QgsProcessingException( "Error in DEM: All grids must be of same extent and resolution")
 
             # response to issue and #230
             nd = dataSet.GetRasterBand(1).GetNoDataValue()
@@ -439,13 +420,12 @@ class ProcessingSOLWEIGAlgorithm():
             if alt > 0:
                 alt = 3.
 
-        if (dsmraise != demraise) and (dsmraise - demraise > 0.5):
-            logger.warning('WARNiNG! DEM and DSM was raised unequally (difference > 0.5 m). Check your input data!')
-            exit(0)
+            if (dsmraise != demraise) and (dsmraise - demraise > 0.5):
+                logger.warning('WARNiNG! DEM and DSM was raised unequally (difference > 0.5 m). Check your input data!')
 
         #SVFs
-        logger.debug(f"Zip file for SVF will be opened from {os.path.join(os.getcwd(), parameter_dict['inputSVF'])}")
-        zip = zipfile.ZipFile(os.path.join(os.getcwd(), parameter_dict["inputSVF"]), 'r')
+        self.check_if_path_exists(parameter_dict["inputSVF"])
+        zip = zipfile.ZipFile(parameter_dict["inputSVF"], 'r')
         zip.extractall(self.temp_dir)
         zip.close()
 
@@ -496,14 +476,12 @@ class ProcessingSOLWEIGAlgorithm():
                 svfWaveg = np.ones((rows, cols))
         except:
             raise ValueError("SVF import error: The zipfile including the SVFs seems corrupt. Retry calcualting the SVFs in the Pre-processor or choose another file.")
-            # raise QgsProcessingException("SVF import error: The zipfile including the SVFs seems corrupt. Retry calcualting the SVFs in the Pre-processor or choose another file.")
 
         svfsizex = svf.shape[0]
         svfsizey = svf.shape[1]
 
         if not (svfsizex == sizex) & (svfsizey == sizey):  # &
             raise ValueError("Error in svf rasters: All grids must be of same extent and resolution")
-            # raise QgsProcessingException("Error in svf rasters: All grids must be of same extent and resolution")
 
         tmp = svf + svfveg - 1.
         tmp[tmp < 0.] = 0.
@@ -513,10 +491,11 @@ class ProcessingSOLWEIGAlgorithm():
         logger.debug('Sky View Factor rasters loaded')
 
         # wall height layer
-        if parameter_dict["whlayer"] is None:
+        if parameter_dict["whlayer"] == "None":
             raise ValueError("Error: No valid wall height raster layer is selected")
+        self.check_if_path_exists(parameter_dict["whlayer"])
         # provider = parameter_dict["whlayer"].dataProvider()
-        filepath_wh = os.path.join(os.getcwd(), parameter_dict["whlayer"])  # str(provider.dataSourceUri())
+        filepath_wh = parameter_dict["whlayer"]  # str(provider.dataSourceUri())
         self.gdal_wh = gdal.Open(filepath_wh)
         wallheight = self.gdal_wh.ReadAsArray().astype(float)
         vhsizex = wallheight.shape[0]
@@ -525,18 +504,18 @@ class ProcessingSOLWEIGAlgorithm():
             raise ValueError("Error in Wall height raster: All rasters must be of same extent and resolution")
             # raise QgsProcessingException("Error in Wall height raster: All rasters must be of same extent and resolution")
 
-        # wall aspectlayer
-        if parameter_dict["walayer"] is None:
+        # wall aspect layer
+        if parameter_dict["walayer"] == "None":
             raise ValueError("Error: No valid wall aspect raster layer is selected")
+        self.check_if_path_exists(parameter_dict["walayer"])
         # provider = parameter_dict["walayer"].dataProvider()
-        filepath_wa = os.path.join(os.getcwd(), parameter_dict["walayer"])  # str(provider.dataSourceUri())
+        filepath_wa = parameter_dict["walayer"] # str(provider.dataSourceUri())
         self.gdal_wa = gdal.Open(filepath_wa)
         wallaspect = self.gdal_wa.ReadAsArray().astype(float)
         vasizex = wallaspect.shape[0]
         vasizey = wallaspect.shape[1]
         if not (vasizex == sizex) & (vasizey == sizey):
             raise ValueError("Error in Wall aspect raster: All rasters must be of same extent and resolution")
-            # raise QgsProcessingException("Error in Wall aspect raster: All rasters must be of same extent and resolution")
 
         voxelheight = geotransform[1]  # float
 
@@ -546,36 +525,26 @@ class ProcessingSOLWEIGAlgorithm():
         Twater = []
 
         try:
-            self.metdata = np.loadtxt(
-                os.path.join(os.getcwd(), parameter_dict["inputMet"]),
-                skiprows=headernum, delimiter=delim)
+            self.check_if_path_exists(parameter_dict["inputMet"])
+            self.metdata = np.loadtxt(parameter_dict["inputMet"],skiprows=headernum, delimiter=delim)
             logger.debug(f"metfile {self.metdata}")
             metfileexist = 1
         except Exception as e:
             raise ValueError("Error: Make sure format of meteorological file is correct. You can"
                              "prepare your data by using 'Prepare Existing Data' in "
                              f"the Pre-processor {e}")
-            # raise QgsProcessingException("Error: Make sure format of meteorological file is correct. You can"
-            #                                             "prepare your data by using 'Prepare Existing Data' in "
-            #                                             "the Pre-processor")
 
         testwhere = np.where((self.metdata[:, 14] < 0.0) | (self.metdata[:, 14] > 1300.0))
         if testwhere[0].__len__() > 0:
             raise ValueError(f"Error: Kdown - beyond what is expected at line: {str(testwhere[0] + 1)}")
-             # raise QgsProcessingException("Error: Kdown - beyond what is expected at line: " + str(testwhere[0] + 1))
 
         if self.metdata.shape[1] == 24:
             logger.debug("Meteorological data successfully loaded")
-            # feedback.setProgressText("Meteorological data successfully loaded")
         else:
             raise ValueError("Error: Wrong number of columns in meteorological data. You can "
                              "prepare your data by using 'Prepare Existing Data' in "
                              "the Pre-processor")
-            # raise QgsProcessingException("Error: Wrong number of columns in meteorological data. You can "
-            #                                             "prepare your data by using 'Prepare Existing Data' in "
-            #                                             "the Pre-processor")
 
-        # feedback.setProgressText("Calculating sun positions for each time step")
         location = {'longitude': lon, 'latitude': lat, 'altitude': alt}
         logger.debug(f"Calculating sun positions for each time step {location}")
         YYYY, altitude, azimuth, zen, jday, leafon, dectime, altmax = \
@@ -600,19 +569,14 @@ class ProcessingSOLWEIGAlgorithm():
                 raise ValueError("Diffuse radiation include NoData values",
                                  'Tick in the box "Estimate diffuse and direct shortwave..." or aqcuire '
                                  'observed values from external data sources.')
-                # raise QgsProcessingException("Diffuse radiation include NoData values",
-                #                         'Tick in the box "Estimate diffuse and direct shortwave..." or aqcuire '
-                #                         'observed values from external data sources.')
             if np.min(radI) == -999:
                 raise ValueError("Direct radiation include NoData values",
                                  'Tick in the box "Estimate diffuse and direct shortwave..." or aqcuire '
                                  'observed values from external data sources.')
-                # raise QgsProcessingException("Direct radiation include NoData values",
-                #                         'Tick in the box "Estimate diffuse and direct shortwave..." or aqcuire '
-                #                         'observed values from external data sources.')
 
         # POIs check
         if parameter_dict["poilyr"] != "None": # usePOI:
+            self.check_if_path_exists(parameter_dict["poilyr"])
             #header = 'yyyy id   it imin dectime altitude azimuth kdir kdiff kglobal kdown   kup    keast ksouth ' \
             #            'kwest knorth ldown   lup    least lsouth lwest  lnorth   Ta      Tg     RH    Esky   Tmrt    ' \
             #            'I0     CI   Shadow  SVF_b  SVF_bv KsideI PET UTCI'
@@ -625,29 +589,38 @@ class ProcessingSOLWEIGAlgorithm():
             # if poilyr is None:
                 # raise QgsProcessingException("No valid point layer is selected")
 
-            # poi_field = parameter_dict["poi_field"] # self.parameterAsFields(parameters, self.POI_FIELD, context)
+            poi_field = parameter_dict["poi_field"]
             # if poi_field[0] is None:
             #     raise QgsProcessingException("An attribute field with unique values must be selected when using a POI vector file")
-            vlayer = os.path.join(os.getcwd(), parameter_dict["poilyr"])
+            vlayer = parameter_dict["poilyr"]
+            # handle POI as shapefile instead of QgsVectorLayer
             driver = ogr.GetDriverByName("ESRI Shapefile")
             shape = driver.Open(vlayer, 0)
+
             vlayer = shape.GetLayer()
-            # prov = vlayer.dataProvider()
-            # fields = prov.fields()
-            idx = parameter_dict["poi_field"]  # vlayer.fields().indexFromName(parameter_dict["poi_field"][0])
-            numfeat = vlayer.GetFeatureCount()  # vlayer.featureCount()
+
+            # extract indexFromName poi_field
+            fields = driver.Open(parameter_dict['poilyr'], 1)
+            layer_defn = fields.GetLayer().GetLayerDefn()
+            id_name_tuples = [(i, layer_defn.GetFieldDefn(i).GetName()) for i in range(layer_defn.GetFieldCount())]
+            matching_fields = list(filter(lambda t: t[1] == parameter_dict['poi_field'], id_name_tuples))
+
+            try:
+                idx = matching_fields[0][0]
+            except:
+                print(f"Error: POI file ({parameter_dict['poilyr']}) does not have the expected field '{parameter_dict['poi_field']}'. Exiting ..")
+                exit(1)
+
+            numfeat = vlayer.GetFeatureCount()
             poiname = []
             poisxy = np.zeros((numfeat, 3)) - 999
             ind = 0
-            # for f in vlayer.getFeatures():  # looping through each POI
-            for feature_index in range(vlayer.GetFeatureCount()):
+
+            for feature_index in range(numfeat): # looping through each POI
                 f = vlayer.GetFeature(feature_index)
-                y = f.GetGeometryRef().GetY()  # f.geometry().centroid().asPoint().y()
-                x = f.GetGeometryRef().GetX()  # f.geometry().centroid().asPoint().x()
-                import json
-                a = f.ExportToJson()
-                a2 = json.loads(a)
-                poiname.append(int(a2['properties']['id']))  # .attributes()[idx])
+                y = f.geometry().Centroid().GetY()
+                x = f.geometry().Centroid().GetX()
+                poiname.append(f.GetField(idx))
                 poisxy[ind, 0] = ind
                 poisxy[ind, 1] = np.round((x - minx) * scale)
                 if miny >= 0:
@@ -673,7 +646,6 @@ class ProcessingSOLWEIGAlgorithm():
             # sensorheight = parameter_dict["sensorheight"]  # self.parameterAsDouble(parameters, self.SENSOR_HEIGHT, context)
 
             logger.debug("Point of interest (POI) vector data successfully loaded")
-            # feedback.setProgressText("Point of interest (POI) vector data successfully loaded")
 
         # %Parameterisarion for Lup
         # never True?! - unnecessarry request
@@ -758,6 +730,7 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Import shadow matrices (Anisotropic sky)
         if parameter_dict["folderPathPerez"] != "None":  #UseAniso
+            self.check_if_path_exists(parameter_dict["folderPathPerez"])
             anisotropic_sky = 1
             data = np.load(parameter_dict["folderPathPerez"])
             shmat = data['shadowmat']
@@ -769,6 +742,8 @@ class ProcessingSOLWEIGAlgorithm():
                     diffsh[:, :, i] = shmat[:, :, i] - (1 - vegshmat[:, :, i]) * (1 - parameter_dict["transVeg"]) # changes in psi not implemented yet
             else:
                 diffsh = shmat
+                vegshmat += 1
+                vbshvegshmat += 1
 
             # Estimate number of patches based on shadow matrices
             if shmat.shape[2] == 145:
@@ -780,7 +755,7 @@ class ProcessingSOLWEIGAlgorithm():
             elif shmat.shape[2] == 612:
                 patch_option = 4 # patch_option = 4 # 612 patches
             else:
-                logger.debug("patch_option was not set, since shadow matrices shape was not recalled")
+                logger.debug(f"patch_option was not set, since number shadow matrices {shmat.shape[2]} was not recognized.")
 
             # asvf to calculate sunlit and shaded patches
             asvf = np.arccos(np.sqrt(svf))
@@ -823,10 +798,10 @@ class ProcessingSOLWEIGAlgorithm():
         else:
             timestepdec = dectime[1] - dectime[0]
         timeadd = 0.
-        # timeaddE = 0.
-        # timeaddS = 0.
-        # timeaddW = 0.
-        # timeaddN = 0.
+        timeaddE = 0.
+        timeaddS = 0.
+        timeaddW = 0.
+        timeaddN = 0.
         firstdaytime = 1.
 
         # todo: write it to a logfile or so
@@ -839,6 +814,7 @@ class ProcessingSOLWEIGAlgorithm():
                                           parameter_dict["onlyglobal"], trunkratio, parameter_dict["transVeg"],
                                           rows, cols, parameter_dict["pos"], parameter_dict["elvis"],
                                           parameter_dict["cyl"], demforbuild, anisotropic_sky)
+
         logger.debug("Writing settings for this model run to specified output folder (Filename: RunInfoSOLWEIG_YYYY_DOY_HHMM.txt)")
 
         # Save svf
@@ -869,10 +845,18 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Main function
         logger.debug("Executing main model")
-        # feedback.setProgressText("Executing main model")
     
         tmrtplot = np.zeros((rows, cols))
         TgOut1 = np.zeros((rows, cols))
+
+        # Initiate array for I0 values
+        if np.unique(DOY).shape[0] > 1:
+            unique_days = np.unique(DOY)
+            first_unique_day = DOY[DOY == unique_days[0]]
+            I0_array = np.zeros((first_unique_day.shape[0]))
+        else:
+            first_unique_day = DOY.copy()
+            I0_array = np.zeros((DOY.shape[0]))
 
         #numformat = '%d %d %d %d %.5f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f ' \
         #            '%.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f %.2f'
@@ -883,11 +867,6 @@ class ProcessingSOLWEIGAlgorithm():
 
         for i in np.arange(0, Ta.__len__()):
             logger.debug(f"{int(i * (100. / Ta.__len__()))}")
-            # feedback.setProgress(int(i * (100. / Ta.__len__()))) # move progressbar forward
-            # todo, how to check this?
-            # if feedback.isCanceled():
-            #     feedback.setProgressText("Calculation cancelled")
-            #     break
             # Daily water body temperature
             if landcover == 1:
                 if ((dectime[i] - np.floor(dectime[i]))) == 0 or (i == 0):
@@ -954,6 +933,10 @@ class ProcessingSOLWEIGAlgorithm():
             #         bush, Twater, TgK, Tstart, alb_grid, emis_grid, TgK_wall, Tstart_wall, TmaxLST,
             #         TmaxLST_wall, first, second, svfalfa, svfbuveg, firstdaytime, timeadd, timeaddE, timeaddS,
             #         timeaddW, timeaddN, timestepdec, Tgmap1, Tgmap1E, Tgmap1S, Tgmap1W, Tgmap1N, CI, TgOut1, diffsh, ani)
+
+            # Save I0 for I0 vs. Kdown output plot to check if UTC is off
+            if i < first_unique_day.shape[0]:
+                I0_array[i] = I0
 
             tmrtplot = tmrtplot + Tmrt
 
@@ -1084,6 +1067,7 @@ class ProcessingSOLWEIGAlgorithm():
             logger.debug(f"write files {parameter_dict['outputTmrt']} {parameter_dict['outputDir'] + '/Tmrt_' + str(int(YYYY[0, i])) + '_' + str(int(DOY[i])) + '_' + XH + str(int(hours[i])) + XM + str(int(minu[i])) + w + '.tif'}")
             logger.debug(f"output sh {parameter_dict['outputSh']} {parameter_dict['outputDir'] + '/Shadow_' + str(int(YYYY[0, i])) + '_' + str(int(DOY[i])) + '_' + XH + str(int(hours[i])) + XM + str(int(minu[i])) + w + '.tif'}")
             if parameter_dict["outputTmrt"]:
+
                 saveraster(gdal_dsm, parameter_dict["outputDir"] + '/Tmrt_' + str(int(YYYY[0, i])) + '_' + str(int(DOY[i]))
                                 + '_' + XH + str(int(hours[i])) + XM + str(int(minu[i])) + w + '.tif', Tmrt)
             if parameter_dict["outputKup"]:
@@ -1102,6 +1086,14 @@ class ProcessingSOLWEIGAlgorithm():
                 saveraster(gdal_dsm, parameter_dict["outputDir"] + '/Shadow_' + str(int(YYYY[0, i])) + '_' + str(int(DOY[i]))
                                 + '_' + XH + str(int(hours[i])) + XM + str(int(minu[i])) + w + '.tif', shadow)
 
+            if parameter_dict["outputKdiff"]:
+                saveraster(gdal_dsm, parameter_dict["outputDir"] + '/Kdiff_' + str(int(YYYY[0, i])) + '_' + str(int(DOY[i]))
+                                + '_' + XH + str(int(hours[i])) + XM + str(int(minu[i])) + w + '.tif', dRad)
+
+            # if outputSstr:
+            #     saveraster(gdal_dsm, outputDir + '/Sstr_' + str(int(YYYY[0, i])) + '_' + str(int(DOY[i]))
+            #                     + '_' + XH + str(int(hours[i])) + XM + str(int(minu[i])) + w + '.tif', Sstr)
+
             # Sky view image of patches
             if ((anisotropic_sky == 1) & (i == 0) & (not poisxy is None)):
                     for k in range(poisxy.shape[0]):
@@ -1117,7 +1109,7 @@ class ProcessingSOLWEIGAlgorithm():
             copyfile(filepath_dsm, parameter_dict["outputDir"] + '/DSM.tif')
 
             # Save met file
-            copyfile(parameter_dict["inputMet"], parameter_dict["outputDir"] + '/metfile.txt')
+            # copyfile(parameter_dict["inputMet"], parameter_dict["outputDir"] + '/metfile.txt')
 
             # Save CDSM
             if usevegdem == 1:
@@ -1145,15 +1137,31 @@ class ProcessingSOLWEIGAlgorithm():
                                       parameter_dict["albedo_g"], parameter_dict["ewall"], parameter_dict["eground"],
                                       parameter_dict["absK"], parameter_dict["absL"], alt, patch_option]])
             # todo: typeError: Mismatch between array dtype ('<U32') and format specifier ('%i %i %i %i %i %i %1.2f %1.2f %1.2f %1.2f %1.2f %1.2f %1.2f %i')
-            np.savetxt(os.path.join(os.getcwd(), parameter_dict["outputDir"], 'treeplantersettings.txt'),
+            np.savetxt(os.path.join(parameter_dict["outputDir"], 'treeplantersettings.txt'),
                        settingsData, fmt=settingsFmt, header=settingsHeader, delimiter=' ')
 
-        tmrtplot = tmrtplot / Ta.__len__()  # fix average Tmrt instead of sum, 20191022
-        saveraster(gdal_dsm, os.path.join(os.getcwd(), parameter_dict["outputDir"], 'Tmrt_average.tif'), tmrtplot)
-        logger.debug("SOLWEIG: Model calculation finished.")
-        # feedback.setProgressText("SOLWEIG: Model calculation finished.")
+        # Output I0 vs. Kglobal plot
+        radG_for_plot = radG[DOY == first_unique_day[0]]
+        hours_for_plot = hours[DOY == first_unique_day[0]]
+        fig, ax = plt.subplots()
+        ax.plot(hours_for_plot, I0_array, label='I0')
+        ax.plot(hours_for_plot, radG_for_plot, label='Kglobal')
+        ax.set_ylabel('Shortwave radiation [$Wm^{-2}$]')
+        ax.set_xlabel('Hours')
+        ax.set_title('UTC' + str(int(parameter_dict["utc"])))
+        ax.legend()
+        fig.savefig(parameter_dict["outputDir"] + '/metCheck.png', dpi=150)
 
-        return {self.OUTPUT_DIR: os.path.join(os.getcwd(), parameter_dict["outputDir"])}
+        # Copying met file for SpatialTC
+        copyfile(parameter_dict["inputMet"], parameter_dict["outputDir"] + '/metforcing.txt')
+
+        tmrtplot = tmrtplot / Ta.__len__()  # fix average Tmrt instead of sum, 20191022
+        saveraster(gdal_dsm, os.path.join(parameter_dict["outputDir"], 'Tmrt_average.tif'), tmrtplot)
+        logger.debug("SOLWEIG: Model calculation finished.")
+
+        rmtree(self.temp_dir, ignore_errors=True)
+     
+        return {self.OUTPUT_DIR: parameter_dict["outputDir"]}
     
     def name(self):
         """
@@ -1170,7 +1178,7 @@ class ProcessingSOLWEIGAlgorithm():
         Returns the translated algorithm name, which should be used for any
         user-visible display of the algorithm name.
         """
-        return self.tr(self.name())
+        return self.tr('Outdoor Thermal Comfort: SOLWEIG v2022a')
 
     def group(self):
         """
@@ -1208,6 +1216,7 @@ class ProcessingSOLWEIGAlgorithm():
         url = "https://umep-docs.readthedocs.io/en/latest/processor/Outdoor%20Thermal%20Comfort%20SOLWEIG.html"
         return url
 
+    # Functions tr(..) and icon(..) are not required in the standalone version
     # def tr(self, string):
     #     return QCoreApplication.translate('Processing', string)
 
@@ -1255,13 +1264,13 @@ class ProcessingSOLWEIGAlgorithm():
         parameter_dict["inputMet"] = self._check_parameter(parameters, self.INPUT_MET)
         # usePOI = self.parameterAsBool(parameters, self.POI, context)
         parameter_dict["poilyr"] = self._check_parameter(parameters, self.POI_FILE)
-        parameter_dict["poi_field"] = None
+        parameter_dict["poi_field"] = self._check_parameter(parameters, self.POI_FIELD)
         parameter_dict["mbody"] = self._check_parameter(parameters, self.WEIGHT)
-        parameter_dict["ht"] = self._check_parameter(parameters, self.HEIGHT)
+        parameter_dict["ht"] = self._check_parameter(parameters, self.HEIGHT) / 100.
         parameter_dict["clo"] = self._check_parameter(parameters, self.CLO)
         parameter_dict["age"] = self._check_parameter(parameters, self.AGE)
         parameter_dict["activity"] = self._check_parameter(parameters, self.ACTIVITY)
-        parameter_dict["sex"] = self._check_parameter(parameters, self.SEX)
+        parameter_dict["sex"] = self._check_parameter(parameters, self.SEX) + 1
         parameter_dict["sensorheight"] = self._check_parameter(parameters, self.SENSOR_HEIGHT)
         parameter_dict["saveBuild"] = self._check_parameter(parameters, self.SAVE_BUILD)
         parameter_dict["folderPathPerez"] = self._check_parameter(parameters, self.INPUT_ANISO)
@@ -1302,12 +1311,18 @@ class ProcessingSOLWEIGAlgorithm():
         parameter_dict["outputLup"] = self._check_parameter(parameters, self.OUTPUT_LUP)
         parameter_dict["outputLdown"] = self._check_parameter(parameters, self.OUTPUT_LDOWN)
         parameter_dict["outputTreeplanter"] = self._check_parameter(parameters, self.OUTPUT_TREEPLANTER)
+        parameter_dict["outputKdiff"] = False
 
         # If "Save necessary rasters for TreePlanter tool" is ticked, save Tmrt and Shadow rasters
         if parameter_dict["outputTreeplanter"]:
             parameter_dict["outputTmrt"] = True
+            parameter_dict["outputKup"] = True
+            parameter_dict["outputKdown"] = True
+            parameter_dict["outputLup"] = True
+            parameter_dict["outputLdown"] = True
             parameter_dict["outputSh"] = True
             parameter_dict["saveBuild"] = True
+            parameter_dict["outputKdiff"] = True
 
         if parameters['OUTPUT_DIR'] == 'TEMPORARY_OUTPUT':
             output_path = os.path.join(os.getcwd(), parameter_dict["outputDir"])
@@ -1318,7 +1333,7 @@ class ProcessingSOLWEIGAlgorithm():
             if not os.path.isdir(parameter_dict["outputDir"]):
                 os.mkdir(output_path)
         # if OUTPUT_DIR is given as relative path
-        elif not os.path.isabs(parameters['OUTPUT_DIR']):
+        else:
             output_path = os.path.join(os.getcwd(), parameter_dict["outputDir"])
             if not os.path.isdir(output_path):
                 os.mkdir(output_path)
@@ -1326,7 +1341,10 @@ class ProcessingSOLWEIGAlgorithm():
         return parameter_dict
 
     def _check_parameter(self, parameter_list, eigen_parameter):
-        value = parameter_list[eigen_parameter]
+        try:
+            value = parameter_list[eigen_parameter]
+        except:
+            raise KeyError(f"Parameter {eigen_parameter} was not defined.")
         expected_type = self.param_desc_dict[eigen_parameter]['type']
 
         if 'extension' in self.param_desc_dict[eigen_parameter].keys():
@@ -1334,8 +1352,8 @@ class ProcessingSOLWEIGAlgorithm():
             if ext not in str(value):
                 ValueError(f"Given file has wrong extension {value} {ext}")
 
-
-        logger.debug(f"{value} expected type {expected_type} Any? {expected_type is Any} matching? {isinstance(value, expected_type)} str? {expected_type == str}  tif? {'tif' in str(value)}")
+        logger.debug(f"{value} expected type {expected_type} Any? {expected_type is Any} matching?"
+                     f"{isinstance(value, expected_type)} str? {expected_type == str}  tif? {'tif' in str(value)}")
         if expected_type is Any:
             return value
         # elif "tif" in str(value):
@@ -1368,3 +1386,7 @@ class ProcessingSOLWEIGAlgorithm():
         else:
             raise TypeError(f"Value and expected type did not match. "
                             f"Expected {expected_type}, got value of type {type(value)}")
+
+    def check_if_path_exists(self, input_file):
+        if not os.path.exists(input_file):
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), input_file)
