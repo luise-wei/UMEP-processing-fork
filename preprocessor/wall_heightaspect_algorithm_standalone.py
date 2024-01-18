@@ -34,10 +34,11 @@ from osgeo import gdal
 from osgeo.gdalconst import *
 import numpy as np
 import os
-from functions import wallalgorithms_standalone as wa
+from functions import wallalgorithms as wa
 import inspect
 from pathlib import Path
 from util.misc import saverasternd
+from types import SimpleNamespace
 from typing import Any, Dict
 import logging
 
@@ -46,6 +47,15 @@ FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 # logging.basicConfig(format=FORMAT)
 logger.setLevel(logging.WARNING)
 logger.propagate = False
+
+class DummyFeedback(SimpleNamespace):
+    """class to mock QgsFeedback class in standalone algorithms"""
+
+    def isCanceled(self):
+        return False
+
+    def setProgress(self, value: int):
+        return
 
 # def saverasternd(gdal_data, filename, raster):
 #     rows = gdal_data.RasterYSize
@@ -65,7 +75,7 @@ logger.propagate = False
 #     outDs.SetProjection(gdal_data.GetProjection())
 
 
-class ProcessingWallHeightAspectAlgorithm():
+class ProcessingWallHeightAscpetAlgorithm():
 
     INPUT_LIMIT = 'INPUT_LIMIT'
     INPUT = 'INPUT'
@@ -89,6 +99,7 @@ class ProcessingWallHeightAspectAlgorithm():
 
     def processAlgorithm(self, parameters):
         # aspectcalculation = self.parameterAsBool(parameters, self.ASPECT_BOOL, context)
+        feedback = DummyFeedback()
         
         parameter_dict = self.set_wall_parameter(parameters)
         logger.info(f'Initiating algorithm with parameters {parameter_dict}')
@@ -121,7 +132,7 @@ class ProcessingWallHeightAspectAlgorithm():
         
         logger.info("Calculating wall height")
         total = 100. / (int(dsm.shape[0] * dsm.shape[1]))
-        walls = wa.findwalls(dsm, parameter_dict['inputLimit'], total)
+        walls = wa.findwalls(dsm, parameter_dict['inputLimit'], feedback, total)
 
         wallssave = np.copy(walls)
         saverasternd(gdal_dsm, parameter_dict['outputHeight'], wallssave)
@@ -130,7 +141,7 @@ class ProcessingWallHeightAspectAlgorithm():
             total = 100. / 180.0
             # outputFileAspect = self.parameterAsOutputLayer(parameters, self.OUTPUT_ASPECT, context)
             logger.info("Calculating wall aspect")
-            dirwalls = wa.filter1Goodwin_as_aspect_v3(walls, 1, dsm, total)
+            dirwalls = wa.filter1Goodwin_as_aspect_v3(walls, 1, dsm, feedback, total)
             saverasternd(gdal_dsm, parameter_dict['outputAspect'], dirwalls)
         else:
             logger.warn("Wall aspect not calculated")

@@ -39,7 +39,8 @@ from pathlib import Path
 import zipfile
 import sys
 from util import misc
-from functions import svf_functions_standalone as svf
+from functions import svf_functions as svf
+from types import SimpleNamespace
 from typing import Any, Dict
 import logging
 
@@ -49,6 +50,14 @@ FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
 logger.setLevel(logging.WARNING)
 logger.propagate = False
 
+class DummyFeedback(SimpleNamespace):
+    """class to mock QgsFeedback class in standalone algorithms"""
+
+    def isCanceled(self):
+        return False
+
+    def setProgress(self, value: int):
+        logger.info(f"Progress: {value}")
 
 class ProcessingSkyViewFactorAlgorithm():
     """
@@ -94,6 +103,7 @@ class ProcessingSkyViewFactorAlgorithm():
         # aniso = self.parameterAsBool(parameters, self.ANISO, context)
 
         parameter_dict = self.set_svf_parameter(parameters)
+        feedback = DummyFeedback()
 
         logger.info(f'Initiating algorithm with parameters {parameter_dict}')
 
@@ -170,10 +180,10 @@ class ProcessingSkyViewFactorAlgorithm():
         logger.debug(f"aniso is {parameter_dict['aniso']} {parameter_dict['aniso']  is not None}")
         if parameter_dict["aniso"]:  # == 1:
             logger.info('Calculating SVF using 153 iterations')
-            ret = svf.svfForProcessing153(dsm, vegdsm, vegdsm2, scale, usevegdem)
+            ret = svf.svfForProcessing153(dsm, vegdsm, vegdsm2, scale, usevegdem, feedback)
         else:
             logger.info('Calculating SVF using 655 iterations')
-            ret = svf.svfForProcessing655(dsm, vegdsm, vegdsm2, scale, usevegdem)
+            ret = svf.svfForProcessing655(dsm, vegdsm, vegdsm2, scale, usevegdem, feedback)
 
         filename = parameter_dict["outputFile"]
 
