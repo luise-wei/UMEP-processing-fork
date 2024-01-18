@@ -1292,6 +1292,7 @@ class ProcessingSOLWEIGAlgorithm():
         parameter_dict["eground"] = self._check_parameter(parameters, self.EMIS_GROUND)
         parameter_dict["elvis"] = 0 # option removed 20200907 in processing UMEP
 
+        # OutputParameters
         parameter_dict["outputDir"] = self._check_parameter(parameters, self.OUTPUT_DIR)
         parameter_dict["outputTmrt"] = self._check_parameter(parameters, self.OUTPUT_TMRT)
         parameter_dict["outputSh"] = self._check_parameter(parameters, self.OUTPUT_SH)
@@ -1345,28 +1346,6 @@ class ProcessingSOLWEIGAlgorithm():
                      f"{isinstance(value, expected_type)} str? {expected_type == str}  tif? {'tif' in str(value)}")
         if expected_type is Any:
             return value
-        # elif "tif" in str(value):
-        #     raster_file = gdal.Open(value, gdal.GA_ReadOnly)
-        #     return raster_file
-            # projection = osr.SpatialReference(raster_file.GetProjection())
-            # spatial_reference_name = projection.GetAttrValue("AUTHORITY", 0)
-            # spatial_reference_id = projection.GetAttrValue("AUTHORITY", 1)
-            # spatial_reference = spatial_reference_name + ":" + spatial_reference_id
-            #
-            # # read out the transformation variable, it will be useful later
-            # geotransform_input: tuple = raster_file.GetGeoTransform()
-            #
-            # if geotransform_input:
-            #     logger.info(
-            #         "Origin = ({}, {})".format(geotransform_input[0], geotransform_input[3])
-            #     )
-            #     logger.info(
-            #         "Pixel Size = ({}, {})".format(geotransform_input[1], geotransform_input[5])
-            #     )
-            #
-            # # read the bands out of raster file
-            # raster_band: gdal.Band = raster_file.GetRasterBand(1)
-            # return raster_band
         elif isinstance(value, expected_type):
             if type(value) == str and value != "None" and check_dir:
                 if not os.path.exists(str(value)):
