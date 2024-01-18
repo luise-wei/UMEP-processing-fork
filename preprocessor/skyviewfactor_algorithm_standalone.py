@@ -39,7 +39,7 @@ from pathlib import Path
 import zipfile
 import sys
 from util import misc
-from functions import svf_functions as svf
+from functions import svf_functions_standalone as svf
 from types import SimpleNamespace
 from typing import Any, Dict
 import logging

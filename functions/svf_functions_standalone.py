@@ -1,14 +1,6 @@
 import numpy as np
-import logging
-from util import shadowingfunctions_standalone as shadow
+from util import shadowingfunctions as shadow
 from util.SEBESOLWEIGCommonFiles.create_patches import create_patches
-
-logger = logging.getLogger(__name__)
-FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
-# logging.basicConfig(format=FORMAT)
-logger.setLevel(logging.WARNING)
-logger.propagate = False
-
 
 def annulus_weight(altitude, aziinterval):
     n = 90.
@@ -49,7 +41,7 @@ def svf_angles_100121():
     return angleresult
 
 
-def svfForProcessing153(dsm, vegdem, vegdem2, scale, usevegdem):
+def svfForProcessing153(dsm, vegdem, vegdem2, scale, usevegdem, feedback):
     rows = dsm.shape[0]
     cols = dsm.shape[1]
     svf = np.zeros([rows, cols])
@@ -108,23 +100,23 @@ def svfForProcessing153(dsm, vegdem, vegdem2, scale, usevegdem):
     index = int(0)
     for i in range(0, skyvaultaltint.shape[0]):
         for j in np.arange(0, (aziinterval[int(i)])):
-            # if feedback.isCanceled():
-            #     feedback.setProgressText("Calculation cancelled")
-            #     break
+            if feedback.isCanceled():
+                feedback.setProgressText("Calculation cancelled")
+                break
             altitude = skyvaultaltint[int(i)]
             azimuth = iazimuth[int(index)]
 
             # Casting shadow
             if usevegdem == 1:
                 shadowresult = shadow.shadowingfunction_20(dsm, vegdem, vegdem2, azimuth, altitude,
-                                                           scale, amaxvalue, bush, 1)
+                                                           scale, amaxvalue, bush, feedback, 1)
                 vegsh = shadowresult["vegsh"]
                 vbshvegsh = shadowresult["vbshvegsh"]
                 sh = shadowresult["sh"]
                 vegshmat[:, :, index] = vegsh
                 vbshvegshmat[:, :, index] = vbshvegsh
             else:
-                sh = shadow.shadowingfunctionglobalradiation(dsm, azimuth, altitude, scale, 1)
+                sh = shadow.shadowingfunctionglobalradiation(dsm, azimuth, altitude, scale, feedback, 1)
 
             shmat[:, :, index] = sh
 
@@ -163,7 +155,7 @@ def svfForProcessing153(dsm, vegdem, vegdem2, scale, usevegdem):
                         svfNaveg = svfNaveg + weight * vbshvegsh
 
             index += 1
-            # logger.info(f"Progress: {int(index * (100. / np.sum(aziinterval)))}")
+            feedback.setProgress(int(index * (100. / np.sum(aziinterval))))
 
     svfS = svfS + 3.0459e-004
     svfW = svfW + 3.0459e-004
@@ -204,7 +196,7 @@ def svfForProcessing153(dsm, vegdem, vegdem2, scale, usevegdem):
     return svfresult
 
 
-def svfForProcessing655(dsm, vegdem, vegdem2, scale, usevegdem):
+def svfForProcessing655(dsm, vegdem, vegdem2, scale, usevegdem, feedback):
     rows = dsm.shape[0]
     cols = dsm.shape[1]
     svf = np.zeros([rows, cols])
@@ -252,21 +244,21 @@ def svfForProcessing655(dsm, vegdem, vegdem2, scale, usevegdem):
 
     for i in np.arange(0, iangle.shape[0]-1):
         for j in np.arange(0, (aziinterval[int(i)])):
-            # if feedback.isCanceled():
-            #     feedback.setProgressText("Calculation cancelled")
-            #     break
+            if feedback.isCanceled():
+                feedback.setProgressText("Calculation cancelled")
+                break
             altitude = iangle[int(i)]
             azimuth = iazimuth[int(index)-1]
 
             # Casting shadow
             if usevegdem == 1:
                 shadowresult = shadow.shadowingfunction_20(dsm, vegdem, vegdem2, azimuth, altitude,
-                                                            scale, amaxvalue, bush, 1)
+                                                            scale, amaxvalue, bush, feedback, 1)
                 vegsh = shadowresult["vegsh"]
                 vbshvegsh = shadowresult["vbshvegsh"]
                 sh = shadowresult["sh"]
             else:
-                sh = shadow.shadowingfunctionglobalradiation(dsm, azimuth, altitude, scale, 1)
+                sh = shadow.shadowingfunctionglobalradiation(dsm, azimuth, altitude, scale, feedback, 1)
 
             # Calculate svfs
             for k in np.arange(annulino[int(i)]+1, (annulino[int(i+1.)])+1):
@@ -303,7 +295,7 @@ def svfForProcessing655(dsm, vegdem, vegdem2, scale, usevegdem):
                         svfNaveg = svfNaveg + weight * vbshvegsh
 
             index += 1
-            # logger.info(int(index * (100. / 655.)))
+            feedback.setProgress(int(index * (100. / 655.)))
 
     svfS = svfS + 3.0459e-004
     svfW = svfW + 3.0459e-004
