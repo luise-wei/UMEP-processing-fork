@@ -38,6 +38,7 @@ from functions import wallalgorithms as wa
 import inspect
 from pathlib import Path
 from util.misc import saverasternd
+import errno
 from types import SimpleNamespace
 from typing import Any, Dict
 import logging
@@ -199,14 +200,14 @@ class ProcessingWallHeightAscpetAlgorithm():
 
         parameter_dict = {}
         # InputParameters
-        parameter_dict["input"] = self._check_parameter(parameters, self.INPUT)
+        parameter_dict["input"] = self._check_parameter(parameters, self.INPUT, check_dir=True)
         parameter_dict["inputLimit"] = self._check_parameter(parameters, self.INPUT_LIMIT)
-        parameter_dict["outputHeight"] = self._check_parameter(parameters, self.OUTPUT_HEIGHT)
-        parameter_dict["outputAspect"] = self._check_parameter(parameters, self.OUTPUT_ASPECT)
+        parameter_dict["outputHeight"] = self._check_parameter(parameters, self.OUTPUT_HEIGHT, check_dir=True)
+        parameter_dict["outputAspect"] = self._check_parameter(parameters, self.OUTPUT_ASPECT, check_dir=True)
 
         return parameter_dict
 
-    def _check_parameter(self, parameter_list, eigen_parameter):
+    def _check_parameter(self, parameter_list, eigen_parameter, check_dir=False):
         try:
             value = parameter_list[eigen_parameter]
         except KeyError:
@@ -220,10 +221,12 @@ class ProcessingWallHeightAscpetAlgorithm():
             return value
 
         elif isinstance(value, expected_type):
+            if type(value) == str and check_dir:
+                if not os.path.exists(str(value)):
+                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(value))
             return value
         elif expected_type == str:
             return str(value)
-
         else:
             raise TypeError(f"Value and expected type did not match. "
                             f"Expected {expected_type}, got value of type {type(value)}")

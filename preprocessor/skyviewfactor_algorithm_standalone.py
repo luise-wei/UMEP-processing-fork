@@ -40,6 +40,7 @@ import zipfile
 import sys
 from util import misc
 from functions import svf_functions_standalone as svf
+import errno
 from types import SimpleNamespace
 from typing import Any, Dict
 import logging
@@ -354,18 +355,19 @@ class ProcessingSkyViewFactorAlgorithm():
 
         parameter_dict = {}
         # InputParameters
-        parameter_dict["dsmlayer"] = self._check_parameter(parameters, self.INPUT_DSM)
-        parameter_dict["vegdsm"] = self._check_parameter(parameters, self.INPUT_CDSM)
+        parameter_dict["dsmlayer"] = self._check_parameter(parameters, self.INPUT_DSM, check_dir=True)
+        parameter_dict["vegdsm"] = self._check_parameter(parameters, self.INPUT_CDSM, check_dir=True)
         parameter_dict["transVeg"] = self._check_parameter(parameters, self.TRANS_VEG)
-        parameter_dict["vegdsm2"] = self._check_parameter(parameters, self.INPUT_TDSM)
+        parameter_dict["vegdsm2"] = self._check_parameter(parameters, self.INPUT_TDSM, check_dir=True)
         parameter_dict["trunkr"] = self._check_parameter(parameters, self.INPUT_THEIGHT)
         parameter_dict["aniso"] = self._check_parameter(parameters, self.ANISO)
+        # OutputParamenters
         parameter_dict["outputDir"] = self._check_parameter(parameters, self.OUTPUT_DIR)
         parameter_dict["outputFile"] = self._check_parameter(parameters, self.OUTPUT_FILE)
 
         return parameter_dict
 
-    def _check_parameter(self, parameter_list, eigen_parameter):
+    def _check_parameter(self, parameter_list, eigen_parameter, check_dir=False):
         try:
             value = parameter_list[eigen_parameter]
         except:
@@ -376,6 +378,9 @@ class ProcessingSkyViewFactorAlgorithm():
             return value
 
         elif isinstance(value, expected_type):
+            if type(value) == str and value != "None" and check_dir:
+                if not os.path.exists(str(value)):
+                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(value))
             return value
         elif expected_type == str:
             return str(value)

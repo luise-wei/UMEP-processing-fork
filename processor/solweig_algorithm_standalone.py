@@ -232,7 +232,6 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Code from old plugin
         # provider = parameter_dict["dsmlayer"].dataProvider()
-        self.check_if_path_exists(parameter_dict["dsmlayer"])
 
         filepath_dsm = parameter_dict["dsmlayer"]  # str(provider.dataSourceUri())
         gdal_dsm = gdal.Open(filepath_dsm, gdal.GA_ReadOnly)
@@ -309,7 +308,6 @@ class ProcessingSOLWEIGAlgorithm():
 
         # if useVegdem:
         if parameter_dict["vegdsm"] != "None":
-            self.check_if_path_exists(parameter_dict["vegdsm"])
             usevegdem = 1
             logger.debug('Vegetation scheme activated')
 
@@ -327,7 +325,6 @@ class ProcessingSOLWEIGAlgorithm():
                 raise ValueError("Error in Vegetation Canopy DSM: All rasters must be of same extent and resolution")
 
             if parameter_dict["vegdsm2"] != "None":
-                self.check_if_path_exists(parameter_dict["vegdsm2"])
                 gdal.AllRegister()
                 # provider = parameter_dict["vegdsm2"].dataProvider()
                 # filePathOld = str(provider.dataSourceUri())
@@ -353,7 +350,6 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Land cover
         if parameter_dict["lcgrid"] != "None":
-            self.check_if_path_exists(parameter_dict["lcgrid"])
             landcover = 1
             logger.debug('Land cover scheme activated')
 
@@ -391,7 +387,6 @@ class ProcessingSOLWEIGAlgorithm():
 
             if dem == "None":
                 raise ValueError("Error: No valid DEM selected")
-            self.check_if_path_exists(dem)
 
             # load raster
             gdal.AllRegister()
@@ -424,7 +419,6 @@ class ProcessingSOLWEIGAlgorithm():
                 logger.warning('WARNiNG! DEM and DSM was raised unequally (difference > 0.5 m). Check your input data!')
 
         #SVFs
-        self.check_if_path_exists(parameter_dict["inputSVF"])
         zip = zipfile.ZipFile(parameter_dict["inputSVF"], 'r')
         zip.extractall(self.temp_dir)
         zip.close()
@@ -493,7 +487,6 @@ class ProcessingSOLWEIGAlgorithm():
         # wall height layer
         if parameter_dict["whlayer"] == "None":
             raise ValueError("Error: No valid wall height raster layer is selected")
-        self.check_if_path_exists(parameter_dict["whlayer"])
         # provider = parameter_dict["whlayer"].dataProvider()
         filepath_wh = parameter_dict["whlayer"]  # str(provider.dataSourceUri())
         self.gdal_wh = gdal.Open(filepath_wh)
@@ -507,7 +500,6 @@ class ProcessingSOLWEIGAlgorithm():
         # wall aspect layer
         if parameter_dict["walayer"] == "None":
             raise ValueError("Error: No valid wall aspect raster layer is selected")
-        self.check_if_path_exists(parameter_dict["walayer"])
         # provider = parameter_dict["walayer"].dataProvider()
         filepath_wa = parameter_dict["walayer"] # str(provider.dataSourceUri())
         self.gdal_wa = gdal.Open(filepath_wa)
@@ -525,7 +517,6 @@ class ProcessingSOLWEIGAlgorithm():
         Twater = []
 
         try:
-            self.check_if_path_exists(parameter_dict["inputMet"])
             self.metdata = np.loadtxt(parameter_dict["inputMet"],skiprows=headernum, delimiter=delim)
             logger.debug(f"metfile {self.metdata}")
             metfileexist = 1
@@ -576,7 +567,6 @@ class ProcessingSOLWEIGAlgorithm():
 
         # POIs check
         if parameter_dict["poilyr"] != "None": # usePOI:
-            self.check_if_path_exists(parameter_dict["poilyr"])
             #header = 'yyyy id   it imin dectime altitude azimuth kdir kdiff kglobal kdown   kup    keast ksouth ' \
             #            'kwest knorth ldown   lup    least lsouth lwest  lnorth   Ta      Tg     RH    Esky   Tmrt    ' \
             #            'I0     CI   Shadow  SVF_b  SVF_bv KsideI PET UTCI'
@@ -730,7 +720,6 @@ class ProcessingSOLWEIGAlgorithm():
 
         # Import shadow matrices (Anisotropic sky)
         if parameter_dict["folderPathPerez"] != "None":  #UseAniso
-            self.check_if_path_exists(parameter_dict["folderPathPerez"])
             anisotropic_sky = 1
             data = np.load(parameter_dict["folderPathPerez"])
             shmat = data['shadowmat']
@@ -1244,26 +1233,26 @@ class ProcessingSOLWEIGAlgorithm():
 
         parameter_dict = {}
         # InputParameters
-        parameter_dict["dsmlayer"] = self._check_parameter(parameters, self.INPUT_DSM)
+        parameter_dict["dsmlayer"] = self._check_parameter(parameters, self.INPUT_DSM, check_dir=True)
         parameter_dict["transVeg"] = self._check_parameter(parameters, self.TRANS_VEG) / 100.
         parameter_dict["firstdayleaf"] = self._check_parameter(parameters, self.LEAF_START)
         parameter_dict["lastdayleaf"] = self._check_parameter(parameters, self.LEAF_END)
         parameter_dict["conifer_bool"] = self._check_parameter(parameters, self.CONIFER_TREES)
-        parameter_dict["vegdsm"] = self._check_parameter(parameters, self.INPUT_CDSM)
-        parameter_dict["vegdsm2"] = self._check_parameter(parameters, self.INPUT_TDSM)
-        parameter_dict["lcgrid"] = self._check_parameter(parameters, self.INPUT_LC)
+        parameter_dict["vegdsm"] = self._check_parameter(parameters, self.INPUT_CDSM, check_dir=True)
+        parameter_dict["vegdsm2"] = self._check_parameter(parameters, self.INPUT_TDSM, check_dir=True)
+        parameter_dict["lcgrid"] = self._check_parameter(parameters, self.INPUT_LC, check_dir=True)
         parameter_dict["useLcBuild"] = self._check_parameter(parameters, self.USE_LC_BUILD)
-        parameter_dict["dem"] = self._check_parameter(parameters, self.INPUT_DEM)
-        parameter_dict["inputSVF"] = self._check_parameter(parameters, self.INPUT_SVF)
+        parameter_dict["dem"] = self._check_parameter(parameters, self.INPUT_DEM, check_dir=True)
+        parameter_dict["inputSVF"] = self._check_parameter(parameters, self.INPUT_SVF, check_dir=True)
         logger.debug(f"inputSVF is {parameter_dict['inputSVF']}")
-        parameter_dict["whlayer"] = self._check_parameter(parameters, self.INPUT_HEIGHT)
-        parameter_dict["walayer"] = self._check_parameter(parameters, self.INPUT_ASPECT)
+        parameter_dict["whlayer"] = self._check_parameter(parameters, self.INPUT_HEIGHT, check_dir=True)
+        parameter_dict["walayer"] = self._check_parameter(parameters, self.INPUT_ASPECT, check_dir=True)
         parameter_dict["trunkr"] = self._check_parameter(parameters, self.INPUT_THEIGHT)
         parameter_dict["onlyglobal"] = self._check_parameter(parameters, self.ONLYGLOBAL)
         parameter_dict["utc"] = self._check_parameter(parameters, self.UTC)
-        parameter_dict["inputMet"] = self._check_parameter(parameters, self.INPUT_MET)
+        parameter_dict["inputMet"] = self._check_parameter(parameters, self.INPUT_MET, check_dir=True)
         # usePOI = self.parameterAsBool(parameters, self.POI, context)
-        parameter_dict["poilyr"] = self._check_parameter(parameters, self.POI_FILE)
+        parameter_dict["poilyr"] = self._check_parameter(parameters, self.POI_FILE, check_dir=True)
         parameter_dict["poi_field"] = self._check_parameter(parameters, self.POI_FIELD)
         parameter_dict["mbody"] = self._check_parameter(parameters, self.WEIGHT)
         parameter_dict["ht"] = self._check_parameter(parameters, self.HEIGHT) / 100.
@@ -1273,7 +1262,7 @@ class ProcessingSOLWEIGAlgorithm():
         parameter_dict["sex"] = self._check_parameter(parameters, self.SEX) + 1
         parameter_dict["sensorheight"] = self._check_parameter(parameters, self.SENSOR_HEIGHT)
         parameter_dict["saveBuild"] = self._check_parameter(parameters, self.SAVE_BUILD)
-        parameter_dict["folderPathPerez"] = self._check_parameter(parameters, self.INPUT_ANISO)
+        parameter_dict["folderPathPerez"] = self._check_parameter(parameters, self.INPUT_ANISO, check_dir=True)
 
         # Other parameters #
         parameter_dict["absK"] = self._check_parameter(parameters, self.ABS_S)
@@ -1340,7 +1329,7 @@ class ProcessingSOLWEIGAlgorithm():
 
         return parameter_dict
 
-    def _check_parameter(self, parameter_list, eigen_parameter):
+    def _check_parameter(self, parameter_list, eigen_parameter, check_dir=False):
         try:
             value = parameter_list[eigen_parameter]
         except:
@@ -1379,6 +1368,9 @@ class ProcessingSOLWEIGAlgorithm():
             # raster_band: gdal.Band = raster_file.GetRasterBand(1)
             # return raster_band
         elif isinstance(value, expected_type):
+            if type(value) == str and value != "None" and check_dir:
+                if not os.path.exists(str(value)):
+                    raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), str(value))
             return value
         elif expected_type == str:
             return str(value)
@@ -1386,7 +1378,3 @@ class ProcessingSOLWEIGAlgorithm():
         else:
             raise TypeError(f"Value and expected type did not match. "
                             f"Expected {expected_type}, got value of type {type(value)}")
-
-    def check_if_path_exists(self, input_file):
-        if not os.path.exists(input_file):
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), input_file)
