@@ -2,7 +2,6 @@
 # Ready for python action!
 import numpy as np
 # import matplotlib.pylab as plt
-# from numba import jit
 import logging
 logger = logging.getLogger(__name__)
 FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
@@ -51,7 +50,6 @@ def shadowingfunctionglobalradiation(a, azimuth, altitude, scale, forsvf):
     while (amaxvalue >= dz and np.abs(dx) < sizex and np.abs(dy) < sizey):
         if forsvf == 0:
             logger.info(f"Progress: {int(index * total)}")
-
             # dlg.progressBar.setValue(index)
     #while np.logical_and(np.logical_and(amaxvalue >= dz, np.abs(dx) <= sizex), np.abs(dy) <= sizey):(np.logical_and(amaxvalue >= dz, np.abs(dx) <= sizex), np.abs(dy) <= sizey):
         #if np.logical_or(np.logical_and(pibyfour <= azimuth, azimuth < threetimespibyfour), np.logical_and(fivetimespibyfour <= azimuth, azimuth < seventimespibyfour)):
@@ -88,7 +86,7 @@ def shadowingfunctionglobalradiation(a, azimuth, altitude, scale, forsvf):
 
     return sh
 
-# @jit(nopython=True)
+
 def shadowingfunction_20(a, vegdem, vegdem2, azimuth, altitude, scale, amaxvalue, bush, forsvf):
 
     # plt.ion()
@@ -114,6 +112,10 @@ def shadowingfunction_20(a, vegdem, vegdem2, azimuth, altitude, scale, amaxvalue
     degrees = np.pi/180.
     azimuth = azimuth * degrees
     altitude = altitude * degrees
+
+    # does not make a difference in results
+    # if azimuth == 0.0:
+    #     azimuth = 0.000000000001
     
     # measure the size of grid
     sizex = a.shape[0]
@@ -123,7 +125,6 @@ def shadowingfunction_20(a, vegdem, vegdem2, azimuth, altitude, scale, amaxvalue
     if forsvf == 0:
         barstep = np.max([sizex, sizey])
         total = 100. / barstep
-        # feedback.setProgress(0)
         logger.info("Progress: 0")
         # dlg.progressBar.setRange(0, barstep)
         # dlg.progressBar.setValue(0)
@@ -152,7 +153,6 @@ def shadowingfunction_20(a, vegdem, vegdem2, azimuth, altitude, scale, amaxvalue
     tanazimuth = np.tan(azimuth)
     signsinazimuth = np.sign(sinazimuth)
     signcosazimuth = np.sign(cosazimuth)
-    # print(f"{sinazimuth} {cosazimuth} {tanazimuth}")
     dssin = np.abs((1./sinazimuth))
     dscos = np.abs((1./cosazimuth))
     tanaltitudebyscale = np.tan(altitude) / scale

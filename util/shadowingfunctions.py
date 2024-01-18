@@ -2,7 +2,7 @@
 # Ready for python action!
 import numpy as np
 # import matplotlib.pylab as plt
-# from numba import jit
+
 
 def shadowingfunctionglobalradiation(a, azimuth, altitude, scale, feedback, forsvf):
 
@@ -80,7 +80,7 @@ def shadowingfunctionglobalradiation(a, azimuth, altitude, scale, feedback, fors
 
     return sh
 
-# @jit(nopython=True)
+
 def shadowingfunction_20(a, vegdem, vegdem2, azimuth, altitude, scale, amaxvalue, bush, feedback, forsvf):
 
     # plt.ion()
