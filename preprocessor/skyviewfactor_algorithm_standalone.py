@@ -74,7 +74,7 @@ class ProcessingSkyViewFactorAlgorithm():
     INPUT_THEIGHT = 'INPUT_THEIGHT'
     ANISO = 'ANISO'
     OUTPUT_DIR = 'OUTPUT_DIR'
-    OUTPUT_SVF = 'OUTPUT_SVF'
+    OUTPUT_FILE = 'OUTPUT_FILE'
     
     def initAlgorithm(self):
         logger.info("Init SkyViewFactor Algorithm")
@@ -87,13 +87,13 @@ class ProcessingSkyViewFactorAlgorithm():
             self.INPUT_THEIGHT: {'desc': "Trunk zone height (percent of Canopy Height). Used if no Vegetation Trunk-zone DSM is loaded", 'type': float, 'min': 0.1, 'max': 99.9, 'default': 25.0},
             self.ANISO: {'desc': 'Use method with 153 shadow images instead of 655. Required for anisotropic sky scheme (SOLWEIG)', 'type':bool, 'default': True},
             self.OUTPUT_DIR: {'desc': 'Output folder for individual raster files', 'type': str},
-            self.OUTPUT_SVF: {'desc': 'Output sky view factor raster', 'type': str}
+            self.OUTPUT_FILE: {'desc': 'Output sky view factor raster', 'type': str}
         }
 
     def processAlgorithm(self, parameters):
         # InputParameters
         # outputDir = self.parameterAsString(parameters, self.OUTPUT_DIR, context)
-        # outputFile = self.parameterAsOutputLayer(parameters, self.OUTPUT_SVF, context)
+        # outputFile = self.parameterAsOutputLayer(parameters, self.OUTPUT_FILE, context)
         # dsmlayer = self.parameterAsRasterLayer(parameters, self.INPUT_DSM, context)
         # # useVegdem = self.parameterAsBool(parameters, self.USE_VEG, context)
         # transVeg = self.parameterAsDouble(parameters, self.TRANS_VEG, context)
@@ -296,7 +296,7 @@ class ProcessingSkyViewFactorAlgorithm():
 
         logger.info("Sky View Factor: SVF grid(s) successfully generated")
 
-        return {self.OUTPUT_DIR: outputDir, self.OUTPUT_SVF: parameter_dict["outputFile"]}
+        return {self.OUTPUT_DIR: outputDir, self.OUTPUT_FILE: parameter_dict["outputFile"]}
     
     def name(self):
         return 'Urban Geometry: Sky View Factor'
@@ -363,7 +363,7 @@ class ProcessingSkyViewFactorAlgorithm():
         parameter_dict["aniso"] = self._check_parameter(parameters, self.ANISO)
         # OutputParamenters
         parameter_dict["outputDir"] = self._check_parameter(parameters, self.OUTPUT_DIR)
-        parameter_dict["outputFile"] = self._check_parameter(parameters, self.OUTPUT_SVF)
+        parameter_dict["outputFile"] = self._check_parameter(parameters, self.OUTPUT_FILE)
 
         return parameter_dict
 
