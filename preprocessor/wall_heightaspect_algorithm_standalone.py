@@ -78,8 +78,8 @@ class DummyFeedback(SimpleNamespace):
 
 class ProcessingWallHeightAscpetAlgorithm():
 
+    INPUT_DSM = 'INPUT_DSM'
     INPUT_LIMIT = 'INPUT_LIMIT'
-    INPUT = 'INPUT'
     OUTPUT_HEIGHT = 'OUTPUT_HEIGHT'
     OUTPUT_ASPECT = 'OUTPUT_ASPECT'
     # ASPECT_BOOL = 'ASPECT_BOOL'
@@ -88,7 +88,7 @@ class ProcessingWallHeightAscpetAlgorithm():
     def initAlgorithm(self):
 
         self.param_desc_dict = {
-            self.INPUT: {'desc': 'Input building and ground DSM', 'type': str},
+            self.INPUT_DSM: {'desc': 'Input building and ground DSM', 'type': str},
             # self.ASPECT_BOOL: {'desc': 'Calculate wall aspect', 'default': True},
             # self.addParameter(QgsProcessingParameterBoolean(self.ASPECT_BOOL,
             #     self.tr("Calculate wall aspect"),
@@ -101,7 +101,7 @@ class ProcessingWallHeightAscpetAlgorithm():
     def processAlgorithm(self, parameters):
         # aspectcalculation = self.parameterAsBool(parameters, self.ASPECT_BOOL, context)
         feedback = DummyFeedback()
-        
+
         parameter_dict = self.set_wall_parameter(parameters)
         logger.info(f'Initiating algorithm with parameters {parameter_dict}')
 
@@ -112,7 +112,7 @@ class ProcessingWallHeightAscpetAlgorithm():
         # feedback.setProgressText(str(parameters["INPUT"])) # this prints to the processing log tab
         # QgsMessageLog.logMessage("Testing", "umep", level=Qgis.Info) # This prints to a umep tab
         
-        input = os.path.join(parameter_dict["input"])
+        input = os.path.join(parameter_dict["inputDsm"])
         logger.debug(f"input is {input} {type(input)} {input is None}")
         # dem = self.parameterAsRasterLayer(parameters, self.INPUT_DEM, context)
 
@@ -197,13 +197,16 @@ class ProcessingWallHeightAscpetAlgorithm():
             dictionary of checked parameters
 
         """
-
-        parameter_dict = {}
+        parameter_dict = {
+            "inputDsm": self._check_parameter(parameters, self.INPUT_DSM, check_dir=True),
+            "inputLimit": self._check_parameter(parameters, self.INPUT_LIMIT),
+            # TODO: there is something wrong in the _check_parameter / check_dir declaration?
+            #  Because it is checking for full path inclusive of output file, that does not exist yet.
+            #  For now set to False.
+            "outputHeight": self._check_parameter(parameters, self.OUTPUT_HEIGHT, check_dir=False),
+            "outputAspect": self._check_parameter(parameters, self.OUTPUT_ASPECT, check_dir=False)
+        }
         # InputParameters
-        parameter_dict["input"] = self._check_parameter(parameters, self.INPUT, check_dir=True)
-        parameter_dict["inputLimit"] = self._check_parameter(parameters, self.INPUT_LIMIT)
-        parameter_dict["outputHeight"] = self._check_parameter(parameters, self.OUTPUT_HEIGHT, check_dir=True)
-        parameter_dict["outputAspect"] = self._check_parameter(parameters, self.OUTPUT_ASPECT, check_dir=True)
 
         return parameter_dict
 
