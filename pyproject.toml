@@ -1,0 +1,7 @@
+[project]
+name = "umep_processing_fork"
+version = "0.1.0"
+description = "Fork of UMEP-processing including standalone SOLWEIG scripts."
+
+[tool.setuptools]
+packages = ['functions', 'processor', 'preprocessor', 'util']
